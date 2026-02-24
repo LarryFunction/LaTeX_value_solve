@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX 公式求值 - DeepSeek</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 24px;
+            font-size: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #555;
+            font-weight: 500;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .result-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+        .result-content {
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #333;
+            line-height: 1.6;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .error .result-label {
+            color: #dc3545;
+        }
+        .tip {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+        }
+    </style>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📐 LaTeX 公式求值 - DeepSeek</h1>
+            
+            <div class="form-group">
+                <label for="latexInput">LaTeX 公式</label>
+                <textarea id="latexInput" placeholder="例如：x^2 + 2x + 1 = 0"></textarea>
+            </div>
+            
+            <button class="btn" id="submitBtn" onclick="evaluateFormula()">求值</button>
+            
+            <div id="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        async function evaluateFormula() {
+            const latexInput = document.getElementById('latexInput').value.trim();
+            const resultDiv = document.getElementById('result');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            if (!latexInput) {
+                showResult('请输入要计算的公式', true);
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = '计算中...';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/evaluate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        expression: latexInput
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || '请求失败');
+                }
+                
+                showResult(data.result, false);
+                
+            } catch (error) {
+                showResult(`错误: ${error.message}`, true);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '求值';
+            }
+        }
+        
+        function showResult(content, isError) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result' + (isError ? ' error' : '');
+            resultDiv.innerHTML = `
+                <div class="result-label">${isError ? '❌ 错误' : '✅ 结果'}</div>
+                <div class="result-content">${escapeHtml(content)}</div>
+            `;
+            if (!isError && window.MathJax) {
+                MathJax.typesetPromise([resultDiv]).catch(err => console.log(err));
+            }
+        }
+        
+        function escapeHtml(text) {
+            const latexMarkers = [
+                { start: '$$', end: '$$' },
+                { start: '$', end: '$' },
+                { start: '\\[', end: '\\]' },
+                { start: '\\(', end: '\\)' }
+            ];
+            
+            let result = text;
+            const placeholders = [];
+            
+            for (const marker of latexMarkers) {
+                const regex = new RegExp(marker.start + '[\\s\\S]*?' + marker.end, 'g');
+                result = result.replace(regex, (match) => {
+                    const idx = placeholders.length;
+                    placeholders.push(match);
+                    return `__LATEX_${idx}__`;
+                });
+            }
+            
+            result = result.replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                          .replace(/"/g, '&quot;');
+            
+            for (let i = 0; i < placeholders.length; i++) {
+                result = result.replace(`__LATEX_${i}__`, placeholders[i]);
+            }
+            
+            return result;
+        }
+        
+        document.getElementById('latexInput').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                evaluateFormula();
+            }
+        });
+    </script>
+</body>
+</html>
